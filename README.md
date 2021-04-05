@@ -6,7 +6,8 @@
 
 # go-cqhttp
 
-_✨ 基于 [Mirai](https://github.com/mamoe/mirai) 以及 [MiraiGo](https://github.com/Mrs4s/MiraiGo) 的 [cqhttp](https://github.com/howmanybots/onebot/blob/master/README.md) golang 原生实现 ✨_
+_✨ 基于 [Mirai](https://github.com/mamoe/mirai) 以及 [MiraiGo](https://github.com/Mrs4s/MiraiGo) 的 [OneBot](https://github.com/howmanybots/onebot/blob/master/README.md) Golang 原生实现 ✨_  
+
 
 </div>
 
@@ -17,29 +18,31 @@ _✨ 基于 [Mirai](https://github.com/mamoe/mirai) 以及 [MiraiGo](https://git
   <a href="https://github.com/Mrs4s/go-cqhttp/releases">
     <img src="https://img.shields.io/github/v/release/Mrs4s/go-cqhttp?color=blueviolet&include_prereleases" alt="release">
   </a>
+<a href="https://app.fossa.com/projects/git%2Bgithub.com%2FMrs4s%2Fgo-cqhttp?ref=badge_shield" alt="FOSSA Status"><img src="https://app.fossa.com/api/projects/git%2Bgithub.com%2FMrs4s%2Fgo-cqhttp.svg?type=shield"/></a>
   <a href="https://github.com/howmanybots/onebot/blob/master/README.md">
     <img src="https://img.shields.io/badge/OneBot-v11-blue?style=flat&logo=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABABAMAAABYR2ztAAAAIVBMVEUAAAAAAAADAwMHBwceHh4UFBQNDQ0ZGRkoKCgvLy8iIiLWSdWYAAAAAXRSTlMAQObYZgAAAQVJREFUSMftlM0RgjAQhV+0ATYK6i1Xb+iMd0qgBEqgBEuwBOxU2QDKsjvojQPvkJ/ZL5sXkgWrFirK4MibYUdE3OR2nEpuKz1/q8CdNxNQgthZCXYVLjyoDQftaKuniHHWRnPh2GCUetR2/9HsMAXyUT4/3UHwtQT2AggSCGKeSAsFnxBIOuAggdh3AKTL7pDuCyABcMb0aQP7aM4AnAbc/wHwA5D2wDHTTe56gIIOUA/4YYV2e1sg713PXdZJAuncdZMAGkAukU9OAn40O849+0ornPwT93rphWF0mgAbauUrEOthlX8Zu7P5A6kZyKCJy75hhw1Mgr9RAUvX7A3csGqZegEdniCx30c3agAAAABJRU5ErkJggg==" alt="cqhttp">
   </a>
   <a href="https://github.com/Mrs4s/go-cqhttp/actions">
     <img src="https://github.com/Mrs4s/go-cqhttp/workflows/CI/badge.svg" alt="action">
   </a>
+  <a href="https://goreportcard.com/report/github.com/Mrs4s/go-cqhttp">
+  <img src="https://goreportcard.com/badge/github.com/Mrs4s/go-cqhttp" alt="GoReportCard">
+  </a>
 </p>
 
 <p align="center">
-  <a href="http://ishkong.github.io/go-cqhttp-docs">文档</a>
+  <a href="https://docs.go-cqhttp.org/">文档</a>
   ·
   <a href="https://github.com/Mrs4s/go-cqhttp/releases">下载</a>
   ·
-  <a href="https://ishkong.github.io/go-cqhttp-docs/guide/quick_start.html">开始使用</a>
+  <a href="https://docs.go-cqhttp.org/guide/quick_start.html">开始使用</a>
+  ·
+  <a href="https://github.com/Mrs4s/go-cqhttp/blob/master/CONTRIBUTING.md">参与贡献</a>
 </p>
 
----
-
-go-cqhttp 在[原版 cqhttp](https://github.com/richardchien/coolq-http-api)的基础上做了部分修改和拓展.
-
----
 
 ## 兼容性
+go-cqhttp兼容[OneBot-v11](https://github.com/howmanybots/onebot/tree/master/v11/specs)绝大多数内容，并在其基础上做了一些扩展，详情请看go-cqhttp的文档
 
 ### 接口
 
@@ -275,8 +278,9 @@ go-cqhttp 在[原版 cqhttp](https://github.com/richardchien/coolq-http-api)的�
 - 提问找不到重点
 - 重复提问
 
-> 请注意, 开发者并没有义务回复您的问题. 您应该具备基本的提问技巧。
+> 请注意, 开发者并没有义务回复您的问题. 您应该具备基本的提问技巧。  
+> 有关如何提问，请阅读[《提问的智慧》](https://github.com/ryanhanwu/How-To-Ask-Questions-The-Smart-Way/blob/main/README-zh_CN.md)
 
 ## 性能
 
-在关闭数据库的情况下, 加载 25 个好友 128 个群运行 24 小时后内存使用为 10MB 左右. 开启数据库后内存使用将根据消息量增加 10-20MB, 如果系统内存小于 128M 建议关闭数据库使用.
+在关闭数据库的情况下, 加载 25 个好友 128 个群运行 24 小时后内存使用为 15MB 左右. 开启数据库后内存使用将根据消息量增加 10-20MB, 如果系统内存小于 128M 建议关闭数据库使用.
