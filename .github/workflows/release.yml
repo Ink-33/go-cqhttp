@@ -47,7 +47,7 @@ jobs:
         run: sudo apt-get install reprepro createrepo rpm
 
       - name: Sign RPMS
-        run: /
+        run: |
           cp script/rpmmacros ~/.rpmmacros
           rpmsign --addsign dist/*.rpm
 
