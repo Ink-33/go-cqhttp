@@ -48,7 +48,7 @@ jobs:
 
       - name: Sign RPMS
         run: |
-          cp script/rpmmacros ~/.rpmmacros
+          cp scripts/rpmmacros ~/.rpmmacros
           rpmsign --addsign dist/*.rpm
 
       - name: Update Dist
