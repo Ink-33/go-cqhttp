@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"crypto/aes"
 	"crypto/md5"
 	"crypto/sha1"
@@ -160,11 +159,6 @@ func main() {
 		log.SetLevel(log.DebugLevel)
 		log.Warnf("已开启Debug模式.")
 		log.Debugf("开发交流群: 192548878")
-		/*
-			if conf.WebUI == nil || !conf.WebUI.Enabled {
-				log.Warnf("警告: 在Debug模式下未启用WebUi服务, 将无法进行性能分析.")
-			}
-		*/
 	}
 	log.Info("用户交流群: 721829413")
 	if !global.PathExists("device.json") {
@@ -280,27 +274,13 @@ func main() {
 		log.Infof("收到服务器地址更新通知, 将在下一次重连时应用. ")
 		return true
 	})
-	/*
-		if conf.WebUI == nil {
-			conf.WebUI = &global.GoCQWebUI{
-				Enabled:   true,
-				WebInput:  false,
-				Host:      "0.0.0.0",
-				WebUIPort: 9999,
-			}
-		}
-		if conf.WebUI.WebUIPort <= 0 {
-			conf.WebUI.WebUIPort = 9999
-		}
-		if conf.WebUI.Host == "" {
-			conf.WebUI.Host = "127.0.0.1"
-		}
-	*/
 	global.Proxy = conf.Message.ProxyRewrite
-	// b := server.WebServer.Run(fmt.Sprintf("%s:%d", conf.WebUI.Host, conf.WebUI.WebUIPort), cli)
-	// c := server.Console
 	isQRCodeLogin := (conf.Account.Uin == 0 || len(conf.Account.Password) == 0) && !conf.Account.Encrypt
 	isTokenLogin := false
+	saveToken := func() {
+		global.AccountToken = cli.GenToken()
+		_ = ioutil.WriteFile("session.token", global.AccountToken, 0677)
+	}
 	if global.PathExists("session.token") {
 		token, err := ioutil.ReadFile("session.token")
 		if err == nil {
@@ -322,6 +302,7 @@ func main() {
 			if err = cli.TokenLogin(token); err != nil {
 				_ = os.Remove("session.token")
 				log.Warnf("恢复会话失败: %v , 尝试使用正常流程登录.", err)
+				time.Sleep(time.Second)
 			} else {
 				isTokenLogin = true
 			}
@@ -338,16 +319,14 @@ func main() {
 			}
 		}
 	}
-	saveToken := func() {
-		global.AccountToken = cli.GenToken()
-		_ = ioutil.WriteFile("session.token", global.AccountToken, 0677)
-	}
-	saveToken()
 	var times uint = 1 // 重试次数
 	var reLoginLock sync.Mutex
 	cli.OnDisconnected(func(q *client.QQClient, e *client.ClientDisconnectedEvent) {
 		reLoginLock.Lock()
 		defer reLoginLock.Unlock()
+		if cli.Online {
+			return
+		}
 		log.Warnf("Bot已离线: %v", e.Message)
 		if conf.Account.ReLogin.Disabled {
 			os.Exit(1)
@@ -357,11 +336,11 @@ func main() {
 		}
 		if conf.Account.ReLogin.Interval > 0 {
 			log.Warnf("将在 %v 秒后尝试重连. 重连次数：%v/%v", conf.Account.ReLogin.Interval, times, conf.Account.ReLogin.MaxTimes)
+			time.Sleep(time.Second * time.Duration(conf.Account.ReLogin.Interval))
+		} else {
+			time.Sleep(time.Second)
 		}
 		log.Warnf("尝试重连...")
-		if cli.Online {
-			return
-		}
 		if err := cli.TokenLogin(global.AccountToken); err == nil {
 			saveToken()
 			return
@@ -369,10 +348,13 @@ func main() {
 		if isQRCodeLogin {
 			log.Fatalf("快速重连失败")
 		}
+		log.Warnf("快速重连失败, 尝试普通登录. 这可能是因为其他端强行T下线导致的.")
+		time.Sleep(time.Second)
 		if err := commonLogin(); err != nil {
 			log.Fatalf("登录时发生致命错误: %v", err)
 		}
 	})
+	saveToken()
 	cli.AllowSlider = true
 	log.Infof("登录成功 欢迎使用: %v", cli.Nickname)
 	log.Info("开始加载好友列表...")
@@ -471,15 +453,11 @@ func checkUpdate() {
 		return
 	}
 	var res string
-	if err := gout.GET("https://api.github.com/repos/Mrs4s/go-cqhttp/releases").BindBody(&res).Do(); err != nil {
+	if err := gout.GET("https://api.github.com/repos/Mrs4s/go-cqhttp/releases/latest").BindBody(&res).Do(); err != nil {
 		log.Warnf("检查更新失败: %v", err)
 		return
 	}
-	detail := gjson.Parse(res)
-	if len(detail.Array()) < 1 {
-		return
-	}
-	info := detail.Array()[0]
+	info := gjson.Parse(res)
 	if global.VersionNameCompare(coolq.Version, info.Get("tag_name").Str) {
 		log.Infof("当前有更新的 go-cqhttp 可供更新, 请前往 https://github.com/Mrs4s/go-cqhttp/releases 下载.")
 		log.Infof("当前版本: %v 最新版本: %v", coolq.Version, info.Get("tag_name").Str)
@@ -489,22 +467,13 @@ func checkUpdate() {
 }
 
 func selfUpdate(imageURL string) {
-	console := bufio.NewReader(os.Stdin)
-	readLine := func() (str string) {
-		str, _ = console.ReadString('\n')
-		return
-	}
 	log.Infof("正在检查更新.")
 	var res string
-	if err := gout.GET("https://api.github.com/repos/Mrs4s/go-cqhttp/releases").BindBody(&res).Do(); err != nil {
+	if err := gout.GET("https://api.github.com/repos/Mrs4s/go-cqhttp/releases/latest").BindBody(&res).Do(); err != nil {
 		log.Warnf("检查更新失败: %v", err)
 		return
 	}
-	detail := gjson.Parse(res)
-	if len(detail.Array()) < 1 {
-		return
-	}
-	info := detail.Array()[0]
+	info := gjson.Parse(res)
 	version := info.Get("tag_name").Str
 	if coolq.Version != version {
 		log.Info("当前最新版本为 ", version)
