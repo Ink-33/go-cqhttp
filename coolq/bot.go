@@ -23,6 +23,7 @@ import (
 	jsoniter "github.com/json-iterator/go"
 	log "github.com/sirupsen/logrus"
 	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/syndtr/goleveldb/leveldb/opt"
 )
 
 var json = jsoniter.ConfigCompatibleWithStandardLibrary
@@ -58,7 +59,9 @@ func NewQQBot(cli *client.QQClient, conf *config.Config) *CQBot {
 	}
 	if enableLevelDB {
 		p := path.Join("data", "leveldb")
-		db, err := leveldb.OpenFile(p, nil)
+		db, err := leveldb.OpenFile(p, &opt.Options{
+			WriteBuffer: 128 * opt.KiB,
+		})
 		if err != nil {
 			log.Fatalf("打开数据库失败, 如果频繁遇到此问题请清理 data/leveldb 文件夹或关闭数据库功能。")
 		}
@@ -129,10 +132,7 @@ func (bot *CQBot) GetMessage(mid int32) MSG {
 		m := MSG{}
 		data, err := bot.db.Get(binary.ToBytes(mid), nil)
 		if err == nil {
-			buff := global.NewBuffer()
-			defer global.PutBuffer(buff)
-			buff.Write(binary.GZipUncompress(data))
-			err = gob.NewDecoder(buff).Decode(&m)
+			err = gob.NewDecoder(bytes.NewReader(data)).Decode(&m)
 			if err == nil {
 				return m
 			}
@@ -271,7 +271,7 @@ func (bot *CQBot) SendPrivateMessage(target int64, groupID int64, m *message.Sen
 			return 0
 		}
 		if i, ok := elem.(*message.VoiceElement); ok {
-			fv, err := bot.Client.UploadPrivatePtt(target, i.Data)
+			fv, err := bot.Client.UploadPrivatePtt(target, bytes.NewReader(i.Data)) // todo: io.ReadSeeker
 			if err != nil {
 				log.Warnf("警告: 私聊 %v 消息语音上传失败: %v", target, err)
 				continue
@@ -343,9 +343,6 @@ func (bot *CQBot) SendPrivateMessage(target int64, groupID int64, m *message.Sen
 		}
 		log.Errorf("错误: 请先添加 %v(%v) 为好友", nickname, target)
 	}
-	if id == -1 {
-		return -1
-	}
 	return id
 }
 
@@ -368,7 +365,7 @@ func (bot *CQBot) InsertGroupMessage(m *message.GroupMessage) int32 {
 			log.Warnf("记录聊天数据时出现错误: %v", err)
 			return -1
 		}
-		if err := bot.db.Put(binary.ToBytes(id), binary.GZipCompress(buf.Bytes()), nil); err != nil {
+		if err := bot.db.Put(binary.ToBytes(id), buf.Bytes(), nil); err != nil {
 			log.Warnf("记录聊天数据时出现错误: %v", err)
 			return -1
 		}
@@ -384,7 +381,7 @@ func (bot *CQBot) InsertPrivateMessage(m *message.PrivateMessage) int32 {
 		"target":      m.Target,
 		"sender":      m.Sender,
 		"time":        m.Time,
-		"message":     ToStringMessage(m.Elements, m.Sender.Uin, true),
+		"message":     ToStringMessage(m.Elements, 0, true),
 	}
 	id := toGlobalID(m.Sender.Uin, m.Id)
 	if bot.db != nil {
@@ -394,7 +391,7 @@ func (bot *CQBot) InsertPrivateMessage(m *message.PrivateMessage) int32 {
 			log.Warnf("记录聊天数据时出现错误: %v", err)
 			return -1
 		}
-		if err := bot.db.Put(binary.ToBytes(id), binary.GZipCompress(buf.Bytes()), nil); err != nil {
+		if err := bot.db.Put(binary.ToBytes(id), buf.Bytes(), nil); err != nil {
 			log.Warnf("记录聊天数据时出现错误: %v", err)
 			return -1
 		}
@@ -411,8 +408,8 @@ func (bot *CQBot) InsertTempMessage(target int64, m *message.TempMessage) int32 
 		"group-name": m.GroupName,
 		"target":     target,
 		"sender":     m.Sender,
-		"time":       time.Now().Unix(),
-		"message":    ToStringMessage(m.Elements, m.Sender.Uin, true),
+		"time":       int32(time.Now().Unix()),
+		"message":    ToStringMessage(m.Elements, 0, true),
 	}
 	id := toGlobalID(m.Sender.Uin, m.Id)
 	if bot.db != nil {
@@ -422,7 +419,7 @@ func (bot *CQBot) InsertTempMessage(target int64, m *message.TempMessage) int32 
 			log.Warnf("记录聊天数据时出现错误: %v", err)
 			return -1
 		}
-		if err := bot.db.Put(binary.ToBytes(id), binary.GZipCompress(buf.Bytes()), nil); err != nil {
+		if err := bot.db.Put(binary.ToBytes(id), buf.Bytes(), nil); err != nil {
 			log.Warnf("记录聊天数据时出现错误: %v", err)
 			return -1
 		}

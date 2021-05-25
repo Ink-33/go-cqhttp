@@ -47,7 +47,20 @@ func EncodeToSilk(record []byte, tempName string, useCache bool) (silkWav []byte
 	}
 	if useCache {
 		silkPath := path.Join(silkCachePath, tempName+".silk")
-		err = ioutil.WriteFile(silkPath, silkWav, 0666)
+		err = ioutil.WriteFile(silkPath, silkWav, 0o666)
 	}
 	return
+}
+
+// RecodeTo24K 将silk重新编码为 24000 bit rate
+func RecodeTo24K(data []byte) []byte {
+	pcm, err := silk.DecodeSilkBuffToPcm(data, 24000)
+	if err != nil {
+		panic(err)
+	}
+	data, err = silk.EncodePcmBuffToSilk(pcm, 24000, 24000, true)
+	if err != nil {
+		panic(err)
+	}
+	return data
 }

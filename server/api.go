@@ -24,8 +24,16 @@ func getLoginInfo(bot *coolq.CQBot, _ resultGetter) coolq.MSG {
 	return bot.CQGetLoginInfo()
 }
 
+func getQiDianAccountInfo(bot *coolq.CQBot, _ resultGetter) coolq.MSG {
+	return bot.CQGetQiDianAccountInfo()
+}
+
 func getFriendList(bot *coolq.CQBot, _ resultGetter) coolq.MSG {
 	return bot.CQGetFriendList()
+}
+
+func deleteFriend(bot *coolq.CQBot, p resultGetter) coolq.MSG {
+	return bot.CQDeleteFriend(p.Get("id").Int())
 }
 
 func getGroupList(bot *coolq.CQBot, p resultGetter) coolq.MSG {
@@ -145,7 +153,7 @@ func setGroupAdmin(bot *coolq.CQBot, p resultGetter) coolq.MSG {
 }
 
 func sendGroupNotice(bot *coolq.CQBot, p resultGetter) coolq.MSG {
-	return bot.CQSetGroupMemo(p.Get("group_id").Int(), p.Get("content").Str)
+	return bot.CQSetGroupMemo(p.Get("group_id").Int(), p.Get("content").Str, p.Get("image").String())
 }
 
 func setGroupLeave(bot *coolq.CQBot, p resultGetter) coolq.MSG {
@@ -254,6 +262,18 @@ func uploadGroupFile(bot *coolq.CQBot, p resultGetter) coolq.MSG {
 	return bot.CQUploadGroupFile(p.Get("group_id").Int(), p.Get("file").Str, p.Get("name").Str, p.Get("folder").Str)
 }
 
+func groupFileCreateFolder(bot *coolq.CQBot, p resultGetter) coolq.MSG {
+	return bot.CQGroupFileCreateFolder(p.Get("group_id").Int(), p.Get("folder_id").Str, p.Get("name").Str)
+}
+
+func deleteGroupFolder(bot *coolq.CQBot, p resultGetter) coolq.MSG {
+	return bot.CQGroupFileDeleteFolder(p.Get("group_id").Int(), p.Get("folder_id").Str)
+}
+
+func deleteGroupFile(bot *coolq.CQBot, p resultGetter) coolq.MSG {
+	return bot.CQGroupFileDeleteFile(p.Get("group_id").Int(), p.Get("folder_id").Str, p.Get("file_id").Str, int32(p.Get("bus_id").Int()))
+}
+
 func getGroupMsgHistory(bot *coolq.CQBot, p resultGetter) coolq.MSG {
 	return bot.CQGetGroupMessageHistory(p.Get("group_id").Int(), p.Get("message_seq").Int())
 }
@@ -322,10 +342,19 @@ func handleQuickOperation(bot *coolq.CQBot, p resultGetter) coolq.MSG {
 	return bot.CQHandleQuickOperation(p.Get("context"), p.Get("operation"))
 }
 
+func getModelShow(bot *coolq.CQBot, p resultGetter) coolq.MSG {
+	return bot.CQGetModelShow(p.Get("model").String())
+}
+
+func setModelShow(bot *coolq.CQBot, p resultGetter) coolq.MSG {
+	return bot.CQSetModelShow(p.Get("model").String(), p.Get("model_show").String())
+}
+
 // API 是go-cqhttp当前支持的所有api的映射表
 var API = map[string]func(*coolq.CQBot, resultGetter) coolq.MSG{
 	"get_login_info":             getLoginInfo,
 	"get_friend_list":            getFriendList,
+	"delete_friend":              deleteFriend,
 	"get_group_list":             getGroupList,
 	"get_group_info":             getGroupInfo,
 	"get_group_member_list":      getGroupMemberList,
@@ -362,6 +391,9 @@ var API = map[string]func(*coolq.CQBot, resultGetter) coolq.MSG{
 	"get_group_root_files":       getGroupRootFiles,
 	"get_group_files_by_folder":  getGroupFilesByFolder,
 	"get_group_file_url":         getGroupFileURL,
+	"create_group_file_folder":   groupFileCreateFolder,
+	"delete_group_folder":        deleteGroupFolder,
+	"delete_group_file":          deleteGroupFile,
 	"upload_group_file":          uploadGroupFile,
 	"get_group_msg_history":      getGroupMsgHistory,
 	"_get_vip_info":              getVipInfo,
@@ -378,6 +410,9 @@ var API = map[string]func(*coolq.CQBot, resultGetter) coolq.MSG{
 	"check_url_safely":           checkURLSafely,
 	"set_group_anonymous_ban":    setGroupAnonymousBan,
 	".handle_quick_operation":    handleQuickOperation,
+	"qidian_get_account_info":    getQiDianAccountInfo,
+	"_get_model_show":            getModelShow,
+	"_set_model_show":            setModelShow,
 }
 
 func (api *apiCaller) callAPI(action string, p resultGetter) coolq.MSG {

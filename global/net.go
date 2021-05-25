@@ -2,7 +2,6 @@ package global
 
 import (
 	"bufio"
-	"bytes"
 	"compress/gzip"
 	"fmt"
 	"io"
@@ -49,33 +48,19 @@ var (
 
 // GetBytes 对给定URL发送Get请求，返回响应主体
 func GetBytes(url string) ([]byte, error) {
-	req, err := http.NewRequest("GET", url, nil)
+	reader, err := HTTPGetReadCloser(url)
 	if err != nil {
 		return nil, err
 	}
-	req.Header["User-Agent"] = []string{UserAgent}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	if strings.Contains(resp.Header.Get("Content-Encoding"), "gzip") {
-		buffer := bytes.NewBuffer(body)
-		r, _ := gzip.NewReader(buffer)
-		defer r.Close()
-		unCom, err := ioutil.ReadAll(r)
-		return unCom, err
-	}
-	return body, nil
+	defer func() {
+		_ = reader.Close()
+	}()
+	return ioutil.ReadAll(reader)
 }
 
 // DownloadFile 将给定URL对应的文件下载至给定Path
 func DownloadFile(url, path string, limit int64, headers map[string]string) error {
-	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0666)
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0o666)
 	if err != nil {
 		return err
 	}
@@ -123,7 +108,7 @@ func DownloadFileMultiThreading(url, path string, limit int64, threadCount int, 
 	// 初始化分块或直接下载
 	initOrDownload := func() error {
 		copyStream := func(s io.ReadCloser) error {
-			file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0666)
+			file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0o666)
 			if err != nil {
 				return err
 			}
@@ -192,7 +177,7 @@ func DownloadFileMultiThreading(url, path string, limit int64, threadCount int, 
 	// 下载分块
 	downloadBlock := func(block *BlockMetaData) error {
 		req, _ := http.NewRequest("GET", url, nil)
-		file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0666)
+		file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0o666)
 		if err != nil {
 			return err
 		}
@@ -296,4 +281,49 @@ func NeteaseMusicSongInfo(id string) (gjson.Result, error) {
 		return gjson.Result{}, err
 	}
 	return gjson.ParseBytes(d).Get("songs.0"), nil
+}
+
+type gzipCloser struct {
+	f io.Closer
+	r *gzip.Reader
+}
+
+// NewGzipReadCloser 从 io.ReadCloser 创建 gunzip io.ReadCloser
+func NewGzipReadCloser(reader io.ReadCloser) (io.ReadCloser, error) {
+	gzipReader, err := gzip.NewReader(reader)
+	if err != nil {
+		return nil, err
+	}
+	return &gzipCloser{
+		f: reader,
+		r: gzipReader,
+	}, nil
+}
+
+// Read impls io.Reader
+func (g *gzipCloser) Read(p []byte) (n int, err error) {
+	return g.r.Read(p)
+}
+
+// Close impls io.Closer
+func (g *gzipCloser) Close() error {
+	_ = g.f.Close()
+	return g.r.Close()
+}
+
+// HTTPGetReadCloser 从 Http url 获取 io.ReadCloser
+func HTTPGetReadCloser(url string) (io.ReadCloser, error) {
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header["User-Agent"] = []string{UserAgent}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	if strings.Contains(resp.Header.Get("Content-Encoding"), "gzip") {
+		return NewGzipReadCloser(resp.Body)
+	}
+	return resp.Body, err
 }

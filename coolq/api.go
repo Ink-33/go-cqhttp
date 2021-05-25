@@ -46,6 +46,18 @@ func (bot *CQBot) CQGetLoginInfo() MSG {
 	return OK(MSG{"user_id": bot.Client.Uin, "nickname": bot.Client.Nickname})
 }
 
+// CQGetQiDianAccountInfo 获取企点账号信息
+func (bot *CQBot) CQGetQiDianAccountInfo() MSG {
+	if bot.Client.QiDian == nil {
+		return Failed(100, "QIDIAN_PROTOCOL_REQUEST", "请使用企点协议")
+	}
+	return OK(MSG{
+		"master_id":   bot.Client.QiDian.MasterUin,
+		"ext_name":    bot.Client.QiDian.ExtName,
+		"create_time": bot.Client.QiDian.CreateTime,
+	})
+}
+
 // CQGetFriendList 获取好友列表
 //
 // https://git.io/Jtz1L
@@ -59,6 +71,20 @@ func (bot *CQBot) CQGetFriendList() MSG {
 		})
 	}
 	return OK(fs)
+}
+
+// CQDeleteFriend 删除好友
+//
+//
+func (bot *CQBot) CQDeleteFriend(uin int64) MSG {
+	if bot.Client.FindFriend(uin) == nil {
+		return Failed(100, "FRIEND_NOT_FOUND", "好友不存在")
+	}
+	if err := bot.Client.DeleteFriend(uin); err != nil {
+		log.Errorf("删除好友时出现错误: %v", err)
+		return Failed(100, "DELETE_API_ERROR", err.Error())
+	}
+	return OK(nil)
 }
 
 // CQGetGroupList 获取群列表
@@ -260,6 +286,54 @@ func (bot *CQBot) CQUploadGroupFile(groupID int64, file, name, folder string) MS
 	return OK(nil)
 }
 
+// CQGroupFileCreateFolder 拓展API-创建群文件文件夹
+//
+//
+func (bot *CQBot) CQGroupFileCreateFolder(groupID int64, parentID, name string) MSG {
+	fs, err := bot.Client.GetGroupFileSystem(groupID)
+	if err != nil {
+		log.Errorf("获取群 %v 文件系统信息失败: %v", groupID, err)
+		return Failed(100, "FILE_SYSTEM_API_ERROR", err.Error())
+	}
+	if err = fs.CreateFolder(parentID, name); err != nil {
+		log.Errorf("创建群 %v 文件夹失败: %v", groupID, err)
+		return Failed(100, "FILE_SYSTEM_API_ERROR", err.Error())
+	}
+	return OK(nil)
+}
+
+// CQGroupFileDeleteFolder 拓展API-删除群文件文件夹
+//
+//
+func (bot *CQBot) CQGroupFileDeleteFolder(groupID int64, id string) MSG {
+	fs, err := bot.Client.GetGroupFileSystem(groupID)
+	if err != nil {
+		log.Errorf("获取群 %v 文件系统信息失败: %v", groupID, err)
+		return Failed(100, "FILE_SYSTEM_API_ERROR", err.Error())
+	}
+	if err = fs.DeleteFolder(id); err != nil {
+		log.Errorf("删除群 %v 文件夹 %v 时出现文件: %v", groupID, id, err)
+		return Failed(200, "FILE_SYSTEM_API_ERROR", err.Error())
+	}
+	return OK(nil)
+}
+
+// CQGroupFileDeleteFile 拓展API-删除群文件
+//
+//
+func (bot *CQBot) CQGroupFileDeleteFile(groupID int64, parentID, id string, busID int32) MSG {
+	fs, err := bot.Client.GetGroupFileSystem(groupID)
+	if err != nil {
+		log.Errorf("获取群 %v 文件系统信息失败: %v", groupID, err)
+		return Failed(100, "FILE_SYSTEM_API_ERROR", err.Error())
+	}
+	if res := fs.DeleteFile(parentID, id, busID); res != "" {
+		log.Errorf("删除群 %v 文件 %v 时出现文件: %v", groupID, id, res)
+		return Failed(200, "FILE_SYSTEM_API_ERROR", res)
+	}
+	return OK(nil)
+}
+
 // CQGetWordSlices 隐藏API-获取中文分词
 //
 // https://docs.go-cqhttp.org/api/#%E8%8E%B7%E5%8F%96%E4%B8%AD%E6%96%87%E5%88%86%E8%AF%8D-%E9%9A%90%E8%97%8F-api
@@ -304,7 +378,7 @@ func (bot *CQBot) CQSendGroupMessage(groupID int64, i interface{}, autoEscape bo
 			if mid == -1 {
 				return Failed(100, "SEND_MSG_API_ERROR", "请参考输出")
 			}
-			log.Infof("发送群 %v(%v) 的消息: %v (%v)", group.Name, groupID, limitedString(ToStringMessage(elem, int64(mid))), mid)
+			log.Infof("发送群 %v(%v) 的消息: %v (%v)", group.Name, groupID, limitedString(ToStringMessage(elem, groupID)), mid)
 			return OK(MSG{"message_id": mid})
 		}
 		str = func() string {
@@ -546,12 +620,26 @@ func (bot *CQBot) CQSetGroupName(groupID int64, name string) MSG {
 // CQSetGroupMemo 扩展API-发送群公告
 //
 // https://docs.go-cqhttp.org/api/#%E5%8F%91%E9%80%81%E7%BE%A4%E5%85%AC%E5%91%8A
-func (bot *CQBot) CQSetGroupMemo(groupID int64, msg string) MSG {
+func (bot *CQBot) CQSetGroupMemo(groupID int64, msg string, img string) MSG {
 	if g := bot.Client.FindGroup(groupID); g != nil {
 		if g.SelfPermission() == client.Member {
 			return Failed(100, "PERMISSION_DENIED", "权限不足")
 		}
-		_ = bot.Client.AddGroupNoticeSimple(groupID, msg)
+		if img != "" {
+			data, err := global.FindFile(img, "", global.ImagePath)
+			if err != nil {
+				return Failed(100, "IMAGE_NOT_FOUND", "图片未找到")
+			}
+			err = bot.Client.AddGroupNoticeWithPic(groupID, msg, data)
+			if err != nil {
+				return Failed(100, "SEND_NOTICE_ERROR", err.Error())
+			}
+		} else {
+			err := bot.Client.AddGroupNoticeSimple(groupID, msg)
+			if err != nil {
+				return Failed(100, "SEND_NOTICE_ERROR", err.Error())
+			}
+		}
 		return OK(nil)
 	}
 	return Failed(100, "GROUP_NOT_FOUND", "群聊不存在")
@@ -952,9 +1040,12 @@ func (bot *CQBot) CQGetImage(file string) MSG {
 		}
 		local := path.Join(global.CachePath, file+"."+path.Ext(msg["filename"].(string)))
 		if !global.PathExists(local) {
-			if data, err := global.GetBytes(msg["url"].(string)); err == nil {
-				_ = ioutil.WriteFile(local, data, 0644)
+			f, _ := os.OpenFile(local, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o0644)
+			if body, err := global.HTTPGetReadCloser(msg["url"].(string)); err == nil {
+				_, _ = f.ReadFrom(body)
+				_ = body.Close()
 			}
+			f.Close()
 		}
 		msg["file"] = local
 		return OK(msg)
@@ -1042,7 +1133,7 @@ func (bot *CQBot) CQGetMessage(messageID int32) MSG {
 			if isGroup {
 				return gid.(int64)
 			}
-			return sender.Uin
+			return 0
 		}(), false),
 	})
 }
@@ -1308,11 +1399,44 @@ func (bot *CQBot) CQGetVersionInfo() MSG {
 				return 2
 			case client.MacOS:
 				return 3
+			case client.QiDian:
+				return 4
 			default:
 				return -1
 			}
 		}(),
 	})
+}
+
+// CQGetModelShow 获取在线机型
+//
+// https://club.vip.qq.com/onlinestatus/set
+func (bot *CQBot) CQGetModelShow(modelName string) MSG {
+	variants, err := bot.Client.GetModelShow(modelName)
+	if err != nil {
+		return Failed(100, "GET_MODEL_SHOW_API_ERROR", "无法获取在线机型")
+	}
+	a := make([]MSG, 0, len(variants))
+	for _, v := range variants {
+		a = append(a, MSG{
+			"model_show": v.ModelShow,
+			"need_pay":   v.NeedPay,
+		})
+	}
+	return OK(MSG{
+		"variants": a,
+	})
+}
+
+// CQSetModelShow 设置在线机型
+//
+// https://club.vip.qq.com/onlinestatus/set
+func (bot *CQBot) CQSetModelShow(modelName string, modelShow string) MSG {
+	err := bot.Client.SetModelShow(modelName, modelShow)
+	if err != nil {
+		return Failed(100, "SET_MODEL_SHOW_API_ERROR", "无法设置在线机型")
+	}
+	return OK(nil)
 }
 
 // OK 生成成功返回值

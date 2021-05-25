@@ -5,34 +5,31 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"hash"
 	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/dustin/go-humanize"
 	"github.com/kardianos/osext"
 	log "github.com/sirupsen/logrus"
 )
 
-// WriteCounter 写入量计算实例
-type WriteCounter struct {
+// WriteSumCounter 写入量计算实例
+type WriteSumCounter struct {
 	Total uint64
+	Hash  hash.Hash
 }
 
 // Write 方法将写入的byte长度追加至写入的总长度Total中
-func (wc *WriteCounter) Write(p []byte) (int, error) {
+func (wc *WriteSumCounter) Write(p []byte) (int, error) {
 	n := len(p)
 	wc.Total += uint64(n)
-	wc.PrintProgress()
-	return n, nil
-}
-
-// PrintProgress 方法将打印当前的总写入量
-func (wc *WriteCounter) PrintProgress() {
-	fmt.Printf("\r%s", strings.Repeat(" ", 35))
+	wc.Hash.Write(p)
+	fmt.Printf("\r                                    ")
 	fmt.Printf("\rDownloading... %s complete", humanize.Bytes(wc.Total))
+	return n, nil
 }
 
 // FromStream copy form getlantern/go-update
@@ -54,7 +51,7 @@ func FromStream(updateWith io.Reader) (err error, errRecover error) {
 	filename := filepath.Base(updatePath)
 	// Copy the contents of of newbinary to a the new executable file
 	newPath := filepath.Join(updateDir, fmt.Sprintf(".%s.new", filename))
-	fp, err := os.OpenFile(newPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
+	fp, err := os.OpenFile(newPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o755)
 	if err != nil {
 		return
 	}
